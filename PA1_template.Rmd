@@ -127,14 +127,13 @@ value = activity_data$steps[idx]
    }
 }
 
-activity_data_filled <- activity_data
-activity_data_filled$steps <- as.numeric(sapply(1:length(activity_data$steps), FUN = replace_by_mean_if_NA))
+activity_data$steps <- as.numeric(sapply(1:length(activity_data$steps), FUN = replace_by_mean_if_NA))
 ```
 
 We remake the histogram of total number of steps per day. We obtain:
 
 ```{r}
-total_steps_per_day <- tapply(activity_data_filled$steps, INDEX = activity_data_filled$date, FUN = sum)
+total_steps_per_day <- tapply(activity_data$steps, INDEX = activity_data$date, FUN = sum)
 hist(total_steps_per_day, main = "Histogram of total steps per day", xlab = "total steps")
 ```
 
@@ -147,3 +146,90 @@ summary(total_steps_per_day)
 We had made two previous mean and median calculations, each depending on when NA values were chosen to be removed. If we compare these new mean and median values with the first mean and median, they have gone up considerably, which is clear since in the first mean and median calculation, days with no measurements contribute as days with 0 total steps. However, these third mean and median values are almost the same as those from the second mean and median calculated. This is explained by the fact that for the second mean and median calculation, the mean and median are calculated over exactly the set of 53 days with complete measurements, and they cover exactly all the measurements (the other 8 days have no measurement at all). The NA values we have filled in for the third mean and median calculation result in adding 8 days equal to the 'average' of these 53 days. Doing this obviously leaves the mean unaltered, and may affect the median, but probably only slightly. This is exactly what we see in this third mean and median calculation (it is by no means a coincidence).
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+In this section we will be making a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+To this end, first we create a new factor variable in the dataset with two levels -- "weekday" and "weekend" indicating whether a given date is a weekday or weekend day:
+
+```{r}
+is_weekend <- weekdays(activity_data$date) %in% c("Saturday","Sunday")
+activity_data$daytype <- as.factor(sapply(is_weekend, FUN = function(x){if(x){"weekend"}else{"weekday"}}))
+```
+
+Now we partition the data frame into two data frames: one for weekdays and one for weekends. They appear as the first and second element of the list **activity_by_daytype**:
+
+
+```{r}
+activity_by_daytype <- split(activity_data, activity_data$daytype)
+```
+
+We calculate for each 5-minute interval in each data frame, the average number of steps taken, averaged across all those days:
+
+```{r}
+steps_per_interval_averaged_over_days_by_daytype <- lapply(activity_by_daytype, FUN = function(x){tapply(x$steps, x$interval, mean)})
+```
+
+We will be unsing ggplot2 to plot the 'average' weekday day against the 'average' weekend day, so we create a data frame with the desired varaibles. Each row has three variables: **steps**, **daytype**, **interval_idx**. Thus each observation (x,y,z) in the data frame accounts for the average number of steps x averaged across all days of type y for the interval z. To create this data frame, we build the columns separately:
+
+For **steps**, we just concatenate the two vectors in steps_per_interval_averaged_over_days_by_daytype:
+
+```{r}
+steps <- c(steps_per_interval_averaged_over_days_by_daytype[[1]], steps_per_interval_averaged_over_days_by_daytype[[2]])
+```
+
+For **daytype**, we know the first 288 observations are from weekdays and the remaining 288 from weekends:
+
+```{r}
+daytype <- rep(c("weekday","weekend"), each = 288)
+```
+
+Finally, the **interval_idx** is just repeating the vector 1:288 twice:
+
+```{r}
+interval_idx <- rep(1:288, times = 2)
+df <- data.frame(steps = steps, daytype = daytype, interval_idx = interval_idx)
+```
+
+With this data frame we make the desired plot:
+
+```{r}
+p <- ggplot(df, aes(x = df$interval_idx, y = df$steps))
+p <- p + facet_grid(daytype ~ .) +
+    geom_line() +
+    scale_x_discrete(breaks = seq(0, 287, by=12), labels = seq(0,2300,by=100)) +
+    xlab("Interval") +
+    ylab("Number of steps") +
+    ggtitle("Number of steps per interval, \naveraged over all days, by day type") +
+    theme(text = element_text(size=15), axis.text.x = element_text(angle=90, vjust=1))
+p
+```
+
+We can see the difference in activity between weekdays and weekends. Most notoriously, weekdays show a much more intense activity in the morning (from 5:30 AM to 8:00 AM) than weekends, which is reasonable as the subject probably wakes up earlier during weekdays.
+
+As a last comment (you can freely ignore everything from this point on if you want), we can check out the data frame for the last plot is fine by doing the weighted average of the 'average' weekday day and the 'average' weekend day to see if we obtain the same plot as that for the 'average' day. The percentage of measurements corresponding to weekends can be calculated as:
+
+```{r}
+mean(is_weekend)
+```
+
+So the average day, as a weighted average of the average weekday day and weekend day is:
+
+```{r}
+avg_day <- subset(df$steps, daytype == "weekend") * mean(is_weekend) + subset(df$steps, daytype == "weekday") * (1 - mean(is_weekend))
+```
+
+And if we plot this:
+```{r}
+df <- data.frame(x = 1:288, y = avg_day)
+p <- ggplot(df, aes(x = x, y = y))
+p <- p +
+    geom_line() +
+    scale_x_discrete(breaks = seq(0, 287, by=12), labels = seq(0,2300,by=100)) +
+    xlab("Interval") +
+    ylab("Number of steps") +
+    ggtitle("Number of steps per interval, averaged over all days") +
+    theme(text = element_text(size=15), axis.text.x = element_text(angle=90, vjust=1))
+p
+```
+
+We obtain the same plot as the original. This confirms our data frame for the last plot was set up correctly.

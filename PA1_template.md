@@ -162,7 +162,7 @@ sum(is.na(activity_data$steps))
 ## [1] 2304
 ```
 
-As a strategy to fill out the missing values in the dataset, we fill them with the mean over all days:
+As a strategy to fill out the missing values in the dataset, we fill them, for each interval, with it's mean over all days as calculated in the previous section:
 
 
 ```r

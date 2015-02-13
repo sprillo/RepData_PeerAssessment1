@@ -127,7 +127,7 @@ p</code></pre>
 <p>The number of missing values in the data (which we already saw before) is:</p>
 <pre class="r"><code>sum(is.na(activity_data$steps))</code></pre>
 <pre><code>## [1] 2304</code></pre>
-<p>As a strategy to fill out the missing values in the dataset, we fill them with the mean over all days:</p>
+<p>As a strategy to fill out the missing values in the dataset, we fill them, for each interval, with it’s mean over all days as calculated in the previous section:</p>
 <pre class="r"><code>replace_by_mean_if_NA &lt;- function(idx){
 value = activity_data$steps[idx]
    interval_number = ((idx - 1) %% 288) + 1
